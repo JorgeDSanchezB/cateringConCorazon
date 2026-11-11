@@ -1,0 +1,496 @@
+// CATERING CON CORAZÓN — Esquema de base de datos (Prisma + SQLite en sandbox;
+// diseñado para migrar a PostgreSQL cambiando únicamente el datasource y
+// activando el tipo Json para Product.attributes — ver docs/decisions/001-stack.md).
+//
+// Convenciones:
+// - Dinero: enteros en CENTAVOS USD (Int). Nunca flotantes.
+// - SQLite no soporta enums ni Json nativo: los enums viven como String y se
+//   validan en la capa de aplicación (Zod); Product.attributes se guarda como
+//   String JSON (equivalente a JSONB) y se valida con JSON Schema (ajv).
+// - Identificadores: UUID v4 generados por Prisma Client.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─────────────────────────── USUARIOS Y ACCESO ───────────────────────────
+
+model User {
+  id                String    @id @default(uuid())
+  email             String    @unique
+  name              String
+  passwordHash      String
+  // ADMIN | STAFF | CONTADOR (validado en aplicación; SQLite no tiene enums)
+  role              String    @default("STAFF")
+  isActive          Boolean   @default(true)
+  mustChangePassword Boolean   @default(false)
+  lastLoginAt       DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  orders            Order[]            @relation("OrderCreator")
+  payments          Payment[]         @relation("PaymentRegistrar")
+  expenses          Expense[]         @relation("ExpenseCreator")
+  invoices          Invoice[]         @relation("InvoiceIssuer")
+  inventoryMovements InventoryMovement[] @relation("MovementAuthor")
+  passwordResets    PasswordReset[]
+}
+
+/// Auditoría de resets de contraseña realizados por un ADMIN.
+model PasswordReset {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+}
+
+// ─────────────────────────── CATÁLOGO ───────────────────────────
+
+model Category {
+  id        String    @id @default(uuid())
+  name      String    @unique
+  slug      String    @unique
+  sortOrder Int       @default(0)
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  products  Product[]
+}
+
+model Product {
+  id                    String    @id @default(uuid())
+  categoryId            String?
+  category              Category? @relation(fields: [categoryId], references: [id])
+  name                  String
+  description           String?
+  // PRODUCT | BEVERAGE (validado en aplicación)
+  type                  String
+  /// Precio base en centavos USD. Variantes suman priceDelta.
+  basePrice             Int
+  imageUrl              String?
+  isFeatured            Boolean   @default(false)
+  isVisible             Boolean   @default(true)
+  /// Borrado lógico: un producto archivado nunca se muestra ni se vende,
+  /// pero se conserva como snapshot en OrderItem.
+  isArchived            Boolean   @default(false)
+  sortOrder             Int       @default(0)
+  /// Atributos dinámicos (JSON serializado; equivalente JSONB). Validado
+  /// contra ProductAttributeSchema de su attributeSchemaVersion.
+  attributes            String?
+  attributeSchemaVersion Int?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  variants              ProductVariant[]
+  orderItems            OrderItem[]
+  comboItems            ComboItem[]
+  stock                 InventoryStock?
+  movements             InventoryMovement[]
+
+  @@index([type, isVisible, isArchived])
+  @@index([createdAt, id])
+  @@index([sortOrder, id])
+  @@index([categoryId])
+}
+
+model ProductVariant {
+  id         String   @id @default(uuid())
+  productId  String
+  product    Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  name       String
+  /// Delta de precio en centavos (puede ser negativo).
+  priceDelta Int      @default(0)
+  sku        String?
+  isActive   Boolean  @default(true)
+  sortOrder  Int      @default(0)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([productId])
+}
+
+/// Esquema JSON Schema (ajv) versionado para Product.attributes.
+/// Solo una fila puede tener isActive=true (garantizado en capa de aplicación).
+model ProductAttributeSchema {
+  id          String   @id @default(uuid())
+  version     Int      @unique
+  schemaJson  String
+  description String?
+  isActive    Boolean  @default(false)
+  createdAt   DateTime @default(now())
+}
+
+model Combo {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  imageUrl    String?
+  // FIXED_PRICE | PERCENT_DISCOUNT (validado en aplicación)
+  pricingMode String
+  /// Precio fijo del combo en centavos (si FIXED_PRICE).
+  fixedPrice  Int?
+  /// Porcentaje de descuento 0-100 sobre la suma de items (si PERCENT_DISCOUNT).
+  discountPercent Int?
+  isVisible   Boolean  @default(true)
+  isFeatured  Boolean  @default(false)
+  sortOrder   Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items       ComboItem[]
+  orderItems  OrderItem[]
+
+  @@index([isVisible, sortOrder])
+}
+
+model ComboItem {
+  id        String  @id @default(uuid())
+  comboId   String
+  combo     Combo   @relation(fields: [comboId], references: [id], onDelete: Cascade)
+  productId String
+  product   Product @relation(fields: [productId], references: [id])
+  quantity  Int     @default(1)
+
+  @@unique([comboId, productId])
+}
+
+// ─────────────────────────── DESCUENTOS ───────────────────────────
+
+model DiscountCode {
+  id          String    @id @default(uuid())
+  /// Código único, almacenado en MAYÚSCULAS (comparación case-insensitive).
+  code        String    @unique
+  // PERCENT | FIXED_AMOUNT
+  type        String
+  /// Porcentaje (0-100) o monto fijo en centavos, según type.
+  value       Int
+  /// Subtotal mínimo (centavos) para aplicar el código.
+  minSubtotal Int       @default(0)
+  /// Máximo de usos globales; null = ilimitado.
+  maxUses     Int?
+  usedCount   Int       @default(0)
+  startsAt    DateTime?
+  endsAt      DateTime?
+  isActive    Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  orders      Order[]
+
+  @@index([isActive])
+}
+
+// ─────────────────────────── EVENTOS Y PEDIDOS ───────────────────────────
+
+model Event {
+  id               String    @id @default(uuid())
+  name             String
+  eventDate        DateTime
+  location         String
+  notes            String?
+  /// Override del mínimo por evento en centavos; null = usar mínimo global.
+  minOrderOverride Int?
+  isActive         Boolean   @default(true)
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  orders           Order[]
+
+  @@index([eventDate])
+}
+
+model Order {
+  id              String    @id @default(uuid())
+  /// Código humano legible (prefijo configurable + contador), ej: CCC-000001.
+  code            String    @unique
+  // EVENT_BOOKING | ONSITE (validado en aplicación)
+  channel         String
+  // PENDING_CONFIRMATION | CONFIRMED | IN_PREPARATION | COMPLETED | CANCELLED
+  status          String    @default("PENDING_CONFIRMATION")
+  eventId         String?
+  event           Event?    @relation(fields: [eventId], references: [id])
+  customerName    String?
+  customerPhone   String?
+  /// Fecha/lugar del evento informados por el cliente en la reserva web.
+  eventDate       DateTime?
+  eventLocation   String?
+  guests          Int?
+  /// Suma de líneas (centavos), sin descuento ni impuesto.
+  subtotal        Int
+  discountCodeId  String?
+  discountCode    DiscountCode? @relation(fields: [discountCodeId], references: [id])
+  discountAmount  Int       @default(0)
+  /// Snapshot del % de IVA aplicado; null = IVA desactivado al crear el pedido.
+  taxPercent      Int?
+  taxAmount       Int       @default(0)
+  total           Int
+  notes           String?
+  /// true si el stock ya fue descontado (para restaurar si se cancela).
+  stockApplied    Boolean   @default(false)
+  createdByUserId String?
+  createdBy       User?     @relation("OrderCreator", fields: [createdByUserId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  items           OrderItem[]
+  payments       Payment[]
+  invoices       Invoice[]
+
+  @@index([createdAt, id])
+  @@index([status])
+  @@index([channel])
+  @@index([eventId])
+}
+
+model OrderItem {
+  id          String         @id @default(uuid())
+  orderId     String
+  order       Order          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  /// Exactamente uno de productId / comboId debe estar definido (invariante aplicado en servicio).
+  productId   String?
+  product     Product?       @relation(fields: [productId], references: [id])
+  comboId     String?
+  combo       Combo?         @relation(fields: [comboId], references: [id])
+  /// Snapshots de nombre/precio para tolerancia a fallos (el catálogo cambia; el pedido no).
+  productName String
+  variantId   String?
+  variantName String?
+  unitPrice   Int
+  quantity    Int
+  lineTotal   Int
+  createdAt   DateTime       @default(now())
+
+  @@index([orderId])
+  @@index([productId])
+  @@index([comboId])
+}
+
+// ─────────────────────────── INVENTARIO ───────────────────────────
+
+model InventoryStock {
+  id               String   @id @default(uuid())
+  productId        String   @unique
+  product          Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  quantity        Int      @default(0)
+  lowStockThreshold Int     @default(5)
+  updatedAt       DateTime @updatedAt
+
+  @@index([quantity])
+}
+
+model InventoryMovement {
+  id        String   @id @default(uuid())
+  productId String
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?    @relation("MovementAuthor", fields: [userId], references: [id])
+  /// Positivo = entrada, negativo = salida.
+  delta     Int
+  /// Motivo obligatorio (auditoría).
+  reason    String
+  createdAt DateTime @default(now())
+
+  @@index([productId, createdAt, id])
+  @@index([createdAt, id])
+}
+
+// ─────────────────────────── CONTABILIDAD Y FACTURACIÓN ───────────────────────────
+
+model Payment {
+  id             String    @id @default(uuid())
+  orderId        String?
+  order          Order?    @relation(fields: [orderId], references: [id])
+  /// Monto en centavos.
+  amount         Int
+  // CASH | TRANSFER | OTHER
+  method         String    @default("CASH")
+  reference      String?
+  notes          String?
+  registeredById String?
+  registeredBy   User?     @relation("PaymentRegistrar", fields: [registeredById], references: [id])
+  receivedAt     DateTime  @default(now())
+  createdAt      DateTime  @default(now())
+
+  @@index([receivedAt])
+  @@index([createdAt, id])
+}
+
+model Expense {
+  id          String    @id @default(uuid())
+  concept     String
+  /// Monto en centavos (positivo).
+  amount      Int
+  category    String?
+  spentAt     DateTime
+  notes       String?
+  createdById String?
+  createdBy   User?     @relation("ExpenseCreator", fields: [createdById], references: [id])
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([spentAt])
+  @@index([createdAt, id])
+}
+
+/// Factura interna (numeración configurable, sin integración SRI real).
+model Invoice {
+  id            String    @id @default(uuid())
+  /// Número formateado, ej: 001-001-000000001 (prefijo + padding configurables).
+  number        String    @unique
+  orderId       String?
+  order         Order?    @relation(fields: [orderId], references: [id])
+  customerName  String?
+  customerTaxId String?
+  subtotal      Int
+  discountAmount Int      @default(0)
+  /// Snapshot del % de IVA.
+  taxPercent    Int       @default(0)
+  taxAmount     Int       @default(0)
+  total         Int
+  // ACTIVE | VOID
+  status        String    @default("ACTIVE")
+  voidedAt      DateTime?
+  voidedReason  String?
+  issuedById    String?
+  issuedBy      User?     @relation("InvoiceIssuer", fields: [issuedById], references: [id])
+  issuedAt      DateTime  @default(now())
+
+  @@index([status, issuedAt])
+  @@index([issuedAt, id])
+}
+
+/// Contadores atómicos de secuencia (pedidos, facturas).
+model Counter {
+  key   String @id
+  value Int
+}
+
+// ─────────────────────────── CONFIGURACIÓN ───────────────────────────
+
+/// Toggles globales editables desde admin (tax_enabled, invoicing_enabled, ...).
+model FeatureFlag {
+  key         String   @id
+  value       Boolean
+  description String
+  updatedAt   DateTime @updatedAt
+}
+
+/// Ajustes de negocio en clave-valor: moneda, locale, timezone, IVA %,
+/// mínimo por evento global, textos de marca/hero/SEO, prefijo de pedido,
+/// prefijo y padding de factura, disclaimer legal, pie de página...
+/// Nunca hardcodeados en la UI.
+model SiteSetting {
+  key      String   @id
+  value    String
+  updatedAt DateTime @updatedAt
+}
+
+/// Tema visual editable desde admin (singleton, id = "theme").
+model ThemeSetting {
+  id               String   @id @default("theme")
+  background       String
+  foreground       String
+  card             String
+  cardForeground   String
+  primary          String
+  primaryForeground String
+  accent           String
+  accentForeground String
+  muted            String
+  mutedForeground  String
+  border           String
+  /// none | sm | md | lg | xl (mapeo técnico a píxeles en lib/theme.ts).
+  radiusLevel      String    @default("lg")
+  /// none | sm | md | lg
+  shadowLevel      String    @default("md")
+  /// Claves del registro técnico de tipografías (whitelist) — ver lib/fonts.ts.
+  fontHeading      String    @default("playfair")
+  fontBody         String    @default("inter")
+  logoUrl          String?
+  faviconUrl       String?
+  updatedAt        DateTime @updatedAt
+}
+
+/// WhatsApp configurable desde admin (singleton, id = "whatsapp").
+model WhatsAppSetting {
+  id            String   @id @default("whatsapp")
+  /// Número E.164 con "+", ej: +593000000000. null/"" = no configurado (fallback en cliente).
+  phoneNumber   String?
+  defaultMessage String
+  buttonLabel   String
+  updatedAt     DateTime @updatedAt
+}
+
+// ─────────────────────────── CONTENIDO ───────────────────────────
+
+model MediaAsset {
+  id        String   @id @default(uuid())
+  url       String
+  filename  String
+  mimeType  String
+  sizeBytes Int
+  alt       String?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt, id])
+}
+
+model Banner {
+  id        String    @id @default(uuid())
+  title     String?
+  subtitle  String?
+  imageUrl  String?
+  /// Enlace interno (hash router), ej: "#/catalogo".
+  linkUrl   String?
+  isVisible Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([isVisible, sortOrder])
+}
+
+model Testimonial {
+  id           String    @id @default(uuid())
+  customerName String
+  text         String
+  /// 1-5 (validado en aplicación).
+  rating       Int        @default(5)
+  isVisible    Boolean    @default(true)
+  sortOrder    Int        @default(0)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([isVisible, sortOrder])
+}
+
+model Faq {
+  id        String    @id @default(uuid())
+  question  String
+  answer    String
+  isVisible Boolean   @default(true)
+  sortOrder Int       @default(0)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  @@index([isVisible, sortOrder])
+}
+
+model LegalPage {
+  id        String   @id @default(uuid())
+  /// privacidad | cookies | terminos | aviso-legal (slugs reservados en seed).
+  slug      String   @unique
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
