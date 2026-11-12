@@ -155,10 +155,11 @@ export default function ThemeView() {
   const [logoPickerOpen, setLogoPickerOpen] = useState(false);
   const [faviconPickerOpen, setFaviconPickerOpen] = useState(false);
 
-  // Copia editable inicial desde el servidor (una sola vez por carga).
-  useEffect(() => {
-    if (data && candidate === null) setCandidate(data.theme);
-  }, [data, candidate]);
+  // Copia editable inicial desde el servidor: ajuste de estado DURANTE el
+  // render (patrón «adjust state when data changes» de React, sin efectos).
+  if (data && candidate === null) {
+    setCandidate(data.theme);
+  }
 
   const pairs = useMemo<ContrastPair[]>(() => (candidate ? checkThemeContrast(candidate) : []), [candidate]);
   const anyFail = pairs.some((p) => !p.pass);

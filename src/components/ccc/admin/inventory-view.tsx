@@ -109,7 +109,7 @@ export default function InventoryView() {
       render: (row) => (
         <div className="flex min-w-0 items-center gap-2.5">
           {row.product.imageUrl ? (
-            // eslint-disable-next-line @next/next/no-img-element
+             
             <img
               src={row.product.imageUrl}
               alt={row.product.name}

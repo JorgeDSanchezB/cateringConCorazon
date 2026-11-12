@@ -4,7 +4,7 @@ import { ConflictError, NotFoundError, ValidationError } from "../errors";
 import { getFlags } from "../flags";
 import { getSiteSettings } from "../settings";
 import { formatMoney } from "../domain/money";
-import { evaluateDiscount } from "../domain/discount";
+import { evaluateDiscount, type DiscountRecord, type DiscountType } from "../domain/discount";
 import { totalsWithTax } from "../domain/tax";
 import {
   buildOrderLines,
@@ -30,7 +30,7 @@ import {
  * Canales: EVENT_BOOKING (reserva web confirmada por WhatsApp) y ONSITE
  * (venta directa en el evento registrada por STAFF/ADMIN).
  *
- * Inventario (ADR-006): ONSITE descuenta stock al registrar la venta;
+ * Inventario (ADR-005): ONSITE descuenta stock al registrar la venta;
  * EVENT_BOOKING lo descuenta al pasar a COMPLETED (el día del evento).
  * CANCELAR un pedido con stock aplicado lo reingresa con movimiento de motivo.
  */
@@ -189,7 +189,12 @@ export async function createBookingOrder(input: BookingOrderInput) {
         { field: "discountCode", message: "El código de descuento no existe." },
       ]);
     }
-    const evaluation = evaluateDiscount(record, {
+    // Enum de aplicación: el valor llega como string de SQLite y se acota al union.
+    const discountRecord: DiscountRecord = {
+      ...record,
+      type: record.type as DiscountType,
+    };
+    const evaluation = evaluateDiscount(discountRecord, {
       subtotalCents: subtotal,
       now: new Date(),
       discountsEnabled: flags.discounts_enabled,
@@ -403,7 +408,15 @@ export async function changeOrderStatus(orderId: string, newStatus: OrderStatus)
   }
 
   const catalog = await loadCatalogSnapshot();
-  const consumption = consumptionWithNames(order.items, catalog.products, catalog.combos);
+  const consumption = consumptionWithNames(
+    order.items.map((item) => ({
+      productId: item.productId ?? undefined,
+      comboId: item.comboId ?? undefined,
+      quantity: item.quantity,
+    })),
+    catalog.products,
+    catalog.combos,
+  );
 
   return db.$transaction(async (tx) => {
     // Reserva completada → consumir stock (si aún no se aplicó).

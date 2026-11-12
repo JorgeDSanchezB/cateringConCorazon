@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, Save } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -48,18 +48,17 @@ export default function WhatsappView() {
   const { data: bootstrap } = useBootstrap();
   const { data, isLoading, isError, error, refetch } = useDetail<WhatsAppResponse>("/api/admin/whatsapp");
 
-  // Borrador editable.
+  // Borrador editable: ajuste de estado DURANTE el render (patrón React sin
+  // efectos — evita re-renderizados en cascada).
   const [phone, setPhone] = useState<string | null>(null);
   const [buttonLabel, setButtonLabel] = useState<string | null>(null);
   const [message, setMessage] = useState<string | null>(null);
 
-  useEffect(() => {
-    if (data && phone === null) {
-      setPhone(data.phoneNumber ?? "");
-      setButtonLabel(data.buttonLabel);
-      setMessage(data.defaultMessage);
-    }
-  }, [data, phone]);
+  if (data && phone === null) {
+    setPhone(data.phoneNumber ?? "");
+    setButtonLabel(data.buttonLabel);
+    setMessage(data.defaultMessage);
+  }
 
   const save = useAdminMutation<WhatsAppResponse, { phoneNumber: string | null; defaultMessage: string; buttonLabel: string }>(
     "PUT",

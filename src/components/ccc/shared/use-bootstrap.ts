@@ -8,13 +8,15 @@ import { formatMoney } from "@/lib/domain/money";
 /**
  * Hook de bootstrap público (settings/flags/tema/whatsapp/contenido).
  * staleTime 60s: los cambios del admin se reflejan al refrescar la vista
- * o al invalidar tras guardar.
+ * o al invalidar tras guardar. `initialData` viene del render del servidor
+ * (page.tsx) para pintar sin parpadeo y sin doble fetch inicial.
  */
-export function useBootstrap() {
+export function useBootstrap(initialData?: PublicBootstrap) {
   return useQuery({
     queryKey: ["public-bootstrap"],
     queryFn: () => api<PublicBootstrap>("/api/public/bootstrap"),
     staleTime: 60_000,
+    initialData,
   });
 }
 

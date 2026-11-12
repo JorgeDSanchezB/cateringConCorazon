@@ -4,6 +4,8 @@ import { NotFoundError, ValidationError } from "../errors";
 import { rowToTheme, themeUpdateSchema, type ThemeData, type ThemeUpdate } from "../theme";
 import { themeContrastProblems } from "../wcag";
 
+export type { ThemeData, ThemeUpdate };
+
 /** Lee el singleton de tema; fila ausente → DEFAULT_THEME + warn de config. */
 export async function getTheme(): Promise<ThemeData> {
   const row = await db.themeSetting.findUnique({ where: { id: "theme" } });

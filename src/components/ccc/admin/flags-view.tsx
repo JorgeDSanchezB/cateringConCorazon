@@ -48,10 +48,24 @@ export default function FlagsView() {
     },
   );
 
-  /** Cambio optimista: se pinta al instante y el PUT revalida (rollback si falla). */
+  /**
+   * Cambio optimista: se pinta al instante y el PUT revalida (rollback si falla).
+   * OJO: la caché de useCursorList es de useInfiniteQuery → la entrada es
+   * { pages: CursorPage[] , pageParams } (no una página suelta).
+   */
   function handleToggle(key: string, next: boolean) {
-    queryClient.setQueryData<CursorPage<FlagItem>>(["/api/admin/flags", {}], (old) =>
-      old ? { ...old, items: old.items.map((f) => (f.key === key ? { ...f, value: next } : f)) } : old,
+    queryClient.setQueryData<{ pages: CursorPage<FlagItem>[]; pageParams: string[] }>(
+      ["/api/admin/flags", {}],
+      (old) =>
+        old
+          ? {
+              ...old,
+              pages: old.pages.map((page) => ({
+                ...page,
+                items: page.items.map((f) => (f.key === key ? { ...f, value: next } : f)),
+              })),
+            }
+          : old,
     );
     toggle.mutate(
       { [key]: next },

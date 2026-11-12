@@ -1,7 +1,7 @@
 /**
  * Dinero en centavos USD (enteros; sin flotantes, sin Intl no determinista).
  * Formato manual determinista con notación US-style ($1,250.50), la
- * convención habitual de Ecuador dolarizado (decisión en ADR-010).
+ * convención habitual de Ecuador dolarizado (decisión en ADR-009).
  */
 
 export function formatMoney(cents: number, symbol = "$"): string {

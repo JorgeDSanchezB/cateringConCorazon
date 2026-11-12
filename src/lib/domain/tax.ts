@@ -4,7 +4,7 @@
  * snapshot en cada pedido (Order.taxPercent, null = IVA desactivado entonces).
  *
  * Modelo: precios SIN IVA incluido; el impuesto se suma sobre la base
- * (subtotal - descuento). Decisión documentada en ADR-012.
+ * (subtotal - descuento). Decisión documentada en ADR-006.
  */
 
 export interface TaxApplication {

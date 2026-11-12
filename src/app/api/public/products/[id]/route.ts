@@ -3,7 +3,7 @@ import { db } from "@/lib/db";
 import { getFlags } from "@/lib/flags";
 import { NotFoundError } from "@/lib/errors";
 import { jsonOk, apiHandler } from "@/lib/http";
-import { parseAttributesForRender } from "@/lib/domain/attributes";
+import { parseAttributesForRender } from "@/lib/domain/attributes-render";
 
 /**
  * GET /api/public/products/:id

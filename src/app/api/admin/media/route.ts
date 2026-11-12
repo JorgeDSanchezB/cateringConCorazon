@@ -14,7 +14,7 @@ import path from "node:path";
  * POST /api/admin/media  (ADMIN) — upload multipart (form-data: file, alt?).
  *
  * Almacenamiento local en public/uploads (S3-compatible documentado como
- * adaptador opcional en ADR-013; el local cumple "funcionar sin servicios
+ * adaptador opcional en ADR-012; el local cumple "funcionar sin servicios
  * externos obligatorios").
  */
 export const GET = apiHandler(async (req: NextRequest) => {

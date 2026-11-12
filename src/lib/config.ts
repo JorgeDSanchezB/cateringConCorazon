@@ -22,6 +22,8 @@ const EnvSchema = z.object({
   LOGIN_MAX_PER_MINUTE: z.coerce.number().int().min(1).default(10),
   ORDER_MAX_PER_MINUTE: z.coerce.number().int().min(1).default(6),
   DISCOUNT_MAX_PER_MINUTE: z.coerce.number().int().min(1).default(20),
+  /** Borradores con IA por minuto (protege el coste del servicio). */
+  AI_DRAFT_MAX_PER_MINUTE: z.coerce.number().int().min(1).default(6),
   /** Límites de atributos dinámicos (Fase 4). */
   ATTRIBUTES_MAX_BYTES: z.coerce.number().int().min(1024).default(16384),
   ATTRIBUTES_MAX_DEPTH: z.coerce.number().int().min(1).max(4).default(2),

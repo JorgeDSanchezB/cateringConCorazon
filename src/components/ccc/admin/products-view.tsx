@@ -63,7 +63,7 @@ import {
   parseAttributesForRender,
   prettyAttributeLabel,
   type AttributesValue,
-} from "@/lib/domain/attributes";
+} from "@/lib/domain/attributes-render";
 
 // ── Tipos del contrato de /api/admin/products ──
 

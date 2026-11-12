@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { AlertTriangle, RotateCcw, Save } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
@@ -60,25 +60,23 @@ export default function SettingsView() {
   const fmt = useSiteFormat();
   const { data, isLoading, isError, error, refetch } = useDetail<SettingsResponse>("/api/admin/settings");
 
-  // Borrador editable (una sola entrada por def.key). Los money guardan centavos.
+  // Inicializa el borrador con los valores EFECTIVOS (values, ya validados):
+  // ajuste de estado DURANTE el render (patrón React sin efectos).
   const [draft, setDraft] = useState<Record<string, string | number | null> | null>(null);
   const [localErrors, setLocalErrors] = useState<Record<string, string>>({});
 
-  // Inicializa el borrador con los valores EFECTIVOS (values, ya validados).
-  useEffect(() => {
-    if (data && draft === null) {
-      const next: Record<string, string | number | null> = {};
-      for (const def of data.defs) {
-        const v = data.values[snakeToCamel(def.key)];
-        if (def.type === "money") {
-          next[def.key] = typeof v === "number" ? v : Number(v ?? 0);
-        } else {
-          next[def.key] = v === undefined || v === null ? "" : String(v);
-        }
+  if (data && draft === null) {
+    const next: Record<string, string | number | null> = {};
+    for (const def of data.defs) {
+      const v = data.values[snakeToCamel(def.key)];
+      if (def.type === "money") {
+        next[def.key] = typeof v === "number" ? v : Number(v ?? 0);
+      } else {
+        next[def.key] = v === undefined || v === null ? "" : String(v);
       }
-      setDraft(next);
     }
-  }, [data, draft]);
+    setDraft(next);
+  }
 
   const saveSettings = useAdminMutation<SettingsResponse, Record<string, string | number>>(
     "PUT",

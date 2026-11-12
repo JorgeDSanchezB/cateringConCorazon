@@ -43,7 +43,12 @@ export function useCursorList<T>(
     queryKey: [endpoint, params ?? {}],
     initialPageParam: null as string | null,
     queryFn: ({ pageParam }) =>
-      api<CursorPage<T>>(buildUrl(endpoint, { ...(params ?? {}), cursor: pageParam ?? undefined })),
+      api<CursorPage<T>>(
+        buildUrl(endpoint, {
+          ...(params ?? {}),
+          cursor: pageParam ?? undefined,
+        } as Record<string, string | number | undefined>),
+      ),
     getNextPageParam: (lastPage) => lastPage.nextCursor,
     enabled: opts.enabled ?? true,
   });

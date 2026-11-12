@@ -6,7 +6,13 @@ import { getFlags } from "@/lib/flags";
 import { ValidationError } from "@/lib/errors";
 import { apiHandler, jsonOk, parseBody } from "@/lib/http";
 import { clientIp, rateLimit } from "@/lib/rate-limit";
-import { DISCOUNT_REJECTION_MESSAGES, discountLabel, evaluateDiscount } from "@/lib/domain/discount";
+import {
+  DISCOUNT_REJECTION_MESSAGES,
+  discountLabel,
+  evaluateDiscount,
+  type DiscountRecord,
+  type DiscountType,
+} from "@/lib/domain/discount";
 
 /**
  * POST /api/public/discounts/validate  { code, subtotalCents }
@@ -34,7 +40,14 @@ export const POST = apiHandler(async (req: NextRequest) => {
     ]);
   }
 
-  const evaluation = evaluateDiscount(record, {
+  // El enum vive en la capa de aplicación (SQLite no tiene enums): el valor
+  // almacenado llega como string y se acota al union del dominio.
+  const discountRecord: DiscountRecord = {
+    ...record,
+    type: record.type as DiscountType,
+  };
+
+  const evaluation = evaluateDiscount(discountRecord, {
     subtotalCents: body.subtotalCents,
     now: new Date(),
     discountsEnabled: flags.discounts_enabled,
@@ -55,6 +68,6 @@ export const POST = apiHandler(async (req: NextRequest) => {
     code: record.code,
     type: record.type,
     amountCents: evaluation.amountCents,
-    label: discountLabel(record),
+    label: discountLabel(discountRecord),
   });
 });

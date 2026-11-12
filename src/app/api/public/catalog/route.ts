@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
 import { getFlags } from "@/lib/flags";
 import { ascCursorClause, getPagination, jsonOk, apiHandler, listEnvelope } from "@/lib/http";
-import { parseAttributesForRender } from "@/lib/domain/attributes";
+import { parseAttributesForRender } from "@/lib/domain/attributes-render";
 
 /**
  * GET /api/public/catalog?limit&cursor&type&category&featured&q

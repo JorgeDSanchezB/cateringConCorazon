@@ -7,7 +7,7 @@ import { getFlag } from "../flags";
 
 /**
  * Facturación INTERNA conmutable por flag `invoicing_enabled`
- * (sin integración SRI real — ADR-008). Numeración:
+ * (sin integración SRI real — ADR-013 y flag invoicing_enabled, ADR-007). Numeración:
  * prefijo + secuencia con padding configurable (default 001-001-000000001).
  *
  * La numeración se genera DENTRO de la misma transacción que la operación

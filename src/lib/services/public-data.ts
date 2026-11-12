@@ -2,7 +2,12 @@ import { db } from "../db";
 import { getSiteSettings, type SiteSettings } from "../settings";
 import { getFlags, type FlagMap } from "../flags";
 import { getTheme, type ThemeData } from "./theme";
-import { DEFAULT_WHATSAPP_TEMPLATE } from "../whatsapp";
+import {
+  DEFAULT_WHATSAPP_TEMPLATE,
+  buildWhatsAppUrl,
+  isValidWhatsAppPhone,
+  renderTemplate,
+} from "../whatsapp";
 
 /**
  * Bootstrap público: todos los datos que la primera pintura de la web
@@ -36,19 +41,26 @@ export interface PublicLegalPageRef {
   title: string;
 }
 
+export interface PublicCategory {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface PublicBootstrap {
   settings: SiteSettings;
   flags: FlagMap;
   theme: ThemeData;
-  whatsapp: { available: boolean; buttonLabel: string };
+  whatsapp: { available: boolean; buttonLabel: string; waUrl: string | null };
   banners: PublicBanner[];
   testimonials: PublicTestimonial[];
   faqs: PublicFaq[];
   legalPages: PublicLegalPageRef[];
+  categories: PublicCategory[];
 }
 
 export async function getPublicBootstrap(): Promise<PublicBootstrap> {
-  const [{ values: settings }, flags, theme, wa, banners, testimonials, faqs, legalPages] =
+  const [{ values: settings }, flags, theme, wa, banners, testimonials, faqs, legalPages, categories] =
     await Promise.all([
       getSiteSettings(),
       getFlags(),
@@ -73,15 +85,30 @@ export async function getPublicBootstrap(): Promise<PublicBootstrap> {
         select: { slug: true, title: true },
         orderBy: { slug: "asc" },
       }),
+      db.category.findMany({
+        where: { isActive: true },
+        select: { id: true, name: true, slug: true },
+        orderBy: [{ sortOrder: "asc" }, { name: "asc" }],
+        take: 30,
+      }),
     ]);
+
+  // WhatsApp: número público del negocio. URL de contacto derivada de la
+  // primera frase de la plantilla editable (sin textos hardcodeados aquí).
+  const phone = wa?.phoneNumber?.trim() || null;
+  const phoneOk = phone !== null && isValidWhatsAppPhone(phone);
+  const template = wa?.defaultMessage?.trim() || DEFAULT_WHATSAPP_TEMPLATE;
+  const greeting = renderTemplate(template, { BRAND: settings.brandName }).split("\n\n")[0]?.trim() ?? "";
+  const waUrl = phoneOk && greeting !== "" ? buildWhatsAppUrl(phone!, greeting) : null;
 
   return {
     settings,
     flags,
     theme,
     whatsapp: {
-      available: Boolean(wa?.phoneNumber && wa.phoneNumber.trim() !== "" && wa.phoneNumber.startsWith("+")),
+      available: phoneOk,
       buttonLabel: wa?.buttonLabel?.trim() || "Reservar por WhatsApp",
+      waUrl,
     },
     banners: banners.map((b) => ({
       id: b.id,
@@ -100,6 +127,7 @@ export async function getPublicBootstrap(): Promise<PublicBootstrap> {
       : [],
     faqs: faqs.map((f) => ({ id: f.id, question: f.question, answer: f.answer })),
     legalPages,
+    categories,
   };
 }
 

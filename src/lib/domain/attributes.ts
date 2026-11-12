@@ -1,7 +1,12 @@
 import Ajv, { type ValidateFunction } from "ajv";
-import { z } from "zod";
 import { config } from "../config";
 import { ValidationError } from "../errors";
+import { attributesShapeSchema, type AttributesValue } from "./attributes-render";
+
+// El shape y los helpers de RENDER viven en attributes-render.ts (cliente-seguro,
+// sin importar config: ese archivo se evalúa también en el navegador).
+export { attributesShapeSchema };
+export type { AttributesValue };
 
 /**
  * FASE 4 — Lógica de inserción extensible.
@@ -21,29 +26,6 @@ import { ValidationError } from "../errors";
  *
  * Justificación de JSONB frente a EAV: ver ADR-003.
  */
-
-const FORBIDDEN_KEYS = new Set([
-  "__proto__",
-  "constructor",
-  "prototype",
-  "toString",
-  "valueOf",
-  "hasOwnProperty",
-  "length",
-]);
-
-const primitiveValue = z.union([z.string(), z.number(), z.boolean(), z.null()]);
-const nestedValue = z.record(z.string().min(1).max(64), primitiveValue);
-const attributeValue = z.union([primitiveValue, nestedValue]);
-
-export const attributesShapeSchema = z
-  .record(z.string().min(1).max(64), attributeValue)
-  .refine(
-    (obj) => Object.keys(obj).every((k) => !FORBIDDEN_KEYS.has(k)),
-    { message: "El objeto contiene claves peligrosas no permitidas." },
-  );
-
-export type AttributesValue = z.output<typeof attributesShapeSchema>;
 
 /** Tamaño serializado en bytes (UTF-8). */
 export function attributesBytes(value: unknown): number {
@@ -188,41 +170,4 @@ export function pipelineAttributes(
     );
   }
   return JSON.stringify(value);
-}
-
-/** Parseo tolerante para LECTURA (renderizado): JSON corrupto → {} + warn. */
-export function parseAttributesForRender(json: string | null): AttributesValue {
-  if (json === null || json === "") return {};
-  try {
-    const parsed = JSON.parse(json) as unknown;
-    if (typeof parsed !== "object" || parsed === null || Array.isArray(parsed)) return {};
-    return parsed as AttributesValue;
-  } catch {
-    console.warn("[RENDER] attributes JSON corrupto ignorado en renderizado");
-    return {};
-  }
-}
-
-/** camelCase/snake_case → etiqueta legible: "sinGluten" → "Sin gluten". */
-export function prettyAttributeLabel(key: string): string {
-  const spaced = key
-    .replace(/([a-z0-9])([A-Z])/g, "$1 $2")
-    .replace(/[_-]+/g, " ")
-    .trim();
-  return spaced.charAt(0).toUpperCase() + spaced.slice(1).toLowerCase();
-}
-
-export type RenderableAttributeValue = boolean | string | number | null | Record<string, boolean | string | number | null>;
-
-/**
- * Valor renderizable para la UI (Fase 5): la card decide qué mostrar.
- * - boolean → Sí/No
- * - null → "No especificado" (solo si aporta, lo decide la UI)
- * - número → String
- */
-export function renderableAttributeValue(v: unknown): RenderableAttributeValue {
-  if (v === null) return null;
-  if (typeof v === "boolean") return v;
-  if (typeof v === "string" || typeof v === "number") return v;
-  return v as Record<string, boolean | string | number | null>;
 }

@@ -8,7 +8,7 @@ import { apiHandler, ascCursorClause, getPagination, jsonOk, listEnvelope, parse
 import { pipelineAttributes } from "@/lib/domain/attributes";
 
 /**
- * GET  /api/admin/products?limit&cursor&type&category&visibility&q&featured  (ADMIN)
+ * GET  /api/admin/products?limit&cursor&type&category&visibility&q  (ADMIN)
  * POST /api/admin/products                                                    (ADMIN)
  *
  * Pipeline de creación (Fase 4):

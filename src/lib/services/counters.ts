@@ -3,7 +3,7 @@ import type { Prisma } from "@prisma/client";
 /**
  * Secuencias atómicas (Counter). Se usan dentro de transacciones Prisma.
  * SQLite serializa escrituras → el upsert con increment es seguro.
- * (ADR-008: numeración interna sin integración SRI real.)
+ * (ADR-013: numeración interna configurable, sin integración SRI real.)
  */
 export async function nextSequence(
   tx: Prisma.TransactionClient,

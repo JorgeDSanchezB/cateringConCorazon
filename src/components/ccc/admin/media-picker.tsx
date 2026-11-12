@@ -139,7 +139,7 @@ export function MediaPicker({
                 <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
                   {list.items.map((asset) => (
                     <div key={asset.id} className="group relative overflow-hidden rounded-md border">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      { }
                       <img
                         src={asset.url}
                         alt={asset.alt ?? asset.filename}
@@ -193,7 +193,7 @@ export function ImageField({
         aria-label="Cambiar imagen"
       >
         {url ? (
-          // eslint-disable-next-line @next/next/no-img-element
+           
           <img src={url} alt="Imagen seleccionada" className="size-full object-cover" />
         ) : (
           <ImageIcon className="size-5 text-muted-foreground" aria-hidden />

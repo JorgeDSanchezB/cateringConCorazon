@@ -3,7 +3,7 @@ import { RateLimitError } from "./errors";
 
 /**
  * Rate limiting en memoria (por proceso). Suficiente para un despliegue
- * único en Vercel/Node; documentado en ADR-011 que un Redis sería la
+ * único en Vercel/Node; documentado en ADR-001 que un Redis compartido sería la
  * alternativa si se escala horizontalmente (descartada por anti-sobreingeniería).
  */
 const buckets = new Map<string, { count: number; resetAt: number }>();

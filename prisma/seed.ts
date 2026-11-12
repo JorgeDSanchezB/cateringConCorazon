@@ -255,14 +255,14 @@ const BANNERS: { id: string; title: string; subtitle: string; imageUrl: string |
     id: "seed-banner-1",
     title: "Menú de temporada",
     subtitle: "Cubanos de alta calidad con pan artesanal del día.",
-    imageUrl: "/images/cubano.jpg",
+    imageUrl: "/images/cubano.png",
     linkUrl: "#/catalogo",
   },
   {
     id: "seed-banner-2",
     title: "Combos para celebrar",
     subtitle: "Precios especiales por combo: tu fiesta completa en un clic.",
-    imageUrl: "/images/dorilocos.jpg",
+    imageUrl: "/images/dorilocos.png",
     linkUrl: "#/catalogo",
   },
 ];
@@ -285,7 +285,7 @@ const PRODUCTS: {
     type: "PRODUCT",
     basePrice: 350,
     categoryId: "seed-category-salados",
-    imageUrl: "/images/sandwiches.jpg",
+    imageUrl: "/images/sandwiches.png",
     description:
       "Sándwich artesanal de pollo marinado, con vegetales frescos y nuestra salsa de la casa. Ideal para toda clase de eventos.",
     sortOrder: 1,
@@ -298,7 +298,7 @@ const PRODUCTS: {
     type: "PRODUCT",
     basePrice: 500,
     categoryId: "seed-category-salados",
-    imageUrl: "/images/cubano.jpg",
+    imageUrl: "/images/cubano.png",
     description:
       "El clásico cubano llevado a otro nivel: pan cristalino, lechón ahumado, jamón de alta calidad, queso fundido y mostaza dijon.",
     sortOrder: 2,
@@ -311,7 +311,7 @@ const PRODUCTS: {
     type: "PRODUCT",
     basePrice: 300,
     categoryId: "seed-category-salados",
-    imageUrl: "/images/dorilocos.jpg",
+    imageUrl: "/images/dorilocos.png",
     description:
       "Nuestro dorilocos con todo: cueritos, maíz, salsas de la casa y limón. El antojo que no puede faltar en la fiesta.",
     sortOrder: 3,
@@ -324,7 +324,7 @@ const PRODUCTS: {
     type: "BEVERAGE",
     basePrice: 200,
     categoryId: "seed-category-bebidas",
-    imageUrl: "/images/naranja.jpg",
+    imageUrl: "/images/naranja.png",
     description:
       "Jugo natural de naranja servido frío, endulzado con un toque de panela. Refrescante y natural.",
     sortOrder: 10,
@@ -421,12 +421,12 @@ async function main() {
     }
     await db.mediaAsset.upsert({
       where: { id: `media-${p.id}` },
-      update: { url: p.imageUrl, filename: p.imageUrl.split("/").pop() ?? "", mimeType: "image/jpeg" },
+      update: { url: p.imageUrl, filename: p.imageUrl.split("/").pop() ?? "", mimeType: "image/png" },
       create: {
         id: `media-${p.id}`,
         url: p.imageUrl,
         filename: p.imageUrl.split("/").pop() ?? "",
-        mimeType: "image/jpeg",
+        mimeType: "image/png",
         sizeBytes: 0,
         alt: p.name,
       },
@@ -442,6 +442,7 @@ async function main() {
         "El favorito de las celebraciones: 2 sándwiches de pollo + 2 bebidas de naranja por persona, a precio de combo.",
       pricingMode: "FIXED_PRICE",
       fixedPrice: 950,
+      imageUrl: "/images/combo-fiesta.png",
       isVisible: true,
       isFeatured: true,
       sortOrder: 1,
@@ -460,6 +461,7 @@ async function main() {
         "El favorito de las celebraciones: 2 sándwiches de pollo + 2 bebidas de naranja por persona, a precio de combo.",
       pricingMode: "FIXED_PRICE",
       fixedPrice: 950,
+      imageUrl: "/images/combo-fiesta.png",
       isVisible: true,
       isFeatured: true,
       sortOrder: 1,
@@ -478,6 +480,7 @@ async function main() {
       description: "2 cubanos de alta calidad + 2 dorilocos: 10% de descuento sobre la suma de los productos.",
       pricingMode: "PERCENT_DISCOUNT",
       discountPercent: 10,
+      imageUrl: "/images/combo-noche.png",
       isVisible: true,
       isFeatured: false,
       sortOrder: 2,
@@ -495,6 +498,7 @@ async function main() {
       description: "2 cubanos de alta calidad + 2 dorilocos: 10% de descuento sobre la suma de los productos.",
       pricingMode: "PERCENT_DISCOUNT",
       discountPercent: 10,
+      imageUrl: "/images/combo-noche.png",
       isVisible: true,
       isFeatured: false,
       sortOrder: 2,
@@ -504,6 +508,27 @@ async function main() {
           { productId: "seed-product-dorilocos", quantity: 2 },
         ],
       },
+    },
+  });
+
+  console.log("→ Descuento de bienvenida");
+  // Código referenciado por la UI pública (placeholder del carrito): se
+  // siembra para que exista de fábrica. El update NO resetea usedCount.
+  await db.discountCode.upsert({
+    where: { code: "BIENVENIDA10" },
+    update: {
+      type: "PERCENT",
+      value: 10,
+      minSubtotal: 5000,
+      isActive: true,
+    },
+    create: {
+      code: "BIENVENIDA10",
+      type: "PERCENT",
+      value: 10,
+      minSubtotal: 5000,
+      maxUses: null,
+      isActive: true,
     },
   });
 
