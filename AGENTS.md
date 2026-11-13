@@ -103,6 +103,22 @@ docs/api-contract.md      Contrato de la API y envolventes de respuesta.
 Admin: `admin@cateringconcorazon.ec` / `CorazonAdmin2025!` (la BD versionada
 incluye datos de desarrollo; en producción regenerarla).
 
+## Despliegue (Vercel + Neon)
+
+Ver `docs/deploy-vercel-neon.md`. Puntos críticos:
+
+- SQLite es SOLO local/sandbox; producción usa Neon PostgreSQL. El esquema
+  Postgres se GENERA desde `prisma/schema.prisma` (`bun run db:schema-pg`),
+  no se edita a mano ni se versiona.
+- `vercel.json` fija el build (`bun run build:vercel`); no cambiar el script
+  `build` (lo usa la plataforma del sandbox con output standalone).
+- Subidas de imágenes: `src/lib/storage.ts` decide Vercel Blob vs disco local
+  según `BLOB_READ_WRITE_TOKEN`. Nunca escribir en disco desde una ruta de
+  API sin pasar por el adaptador.
+- `AUTH_SECRET` es obligatoria en Vercel (fail-fast en `src/lib/config.ts`).
+- Scripts de BD Neon: `db:push-neon`, `db:migrate-neon`, `db:seed-neon`,
+  `db:deploy-neon` (requieren `NEON_DATABASE_URL`, cadena directa).
+
 ## Antes de dar por terminada una tarea
 
 1. `bun run lint` sin errores (el warning preexistente de TanStack Virtual es aceptable).

@@ -1,21 +1,19 @@
 import { NextRequest } from "next/server";
 import type { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { config, ALLOWED_UPLOAD_MIME, UPLOAD_DIR } from "@/lib/config";
+import { config, ALLOWED_UPLOAD_MIME } from "@/lib/config";
 import { requireUser } from "@/lib/auth";
 import { ValidationError } from "@/lib/errors";
 import { apiHandler, descCursorClause, getPagination, jsonOk, listEnvelope } from "@/lib/http";
-import { randomUUID } from "node:crypto";
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
+import { putImage } from "@/lib/storage";
 
 /**
  * GET  /api/admin/media  (ADMIN) — galería paginada por cursor.
  * POST /api/admin/media  (ADMIN) — upload multipart (form-data: file, alt?).
  *
- * Almacenamiento local en public/uploads (S3-compatible documentado como
- * adaptador opcional en ADR-012; el local cumple "funcionar sin servicios
- * externos obligatorios").
+ * Almacenamiento vía adaptador (src/lib/storage.ts): Vercel Blob en
+ * producción (token presente) o disco local public/uploads en desarrollo
+ * (ADR-012). La BD solo guarda la URL pública resultante.
  */
 export const GET = apiHandler(async (req: NextRequest) => {
   await requireUser(req, { roles: ["ADMIN"] });
@@ -66,17 +64,12 @@ export const POST = apiHandler(async (req: NextRequest) => {
   }
   const alt = (form.get("alt") as string | null)?.trim().slice(0, 120) || null;
 
-  const ext = EXT_BY_MIME[mime] ?? "bin";
-  const filename = `${randomUUID()}.${ext}`;
-  const dir = path.join(process.cwd(), UPLOAD_DIR);
-  await mkdir(dir, { recursive: true });
-  const buffer = Buffer.from(await file.arrayBuffer());
-  await writeFile(path.join(dir, filename), buffer);
+  const stored = await putImage({ buffer: Buffer.from(await file.arrayBuffer()), mimeType: mime, ext: EXT_BY_MIME[mime] ?? "bin" });
 
   const asset = await db.mediaAsset.create({
     data: {
-      url: `/uploads/${filename}`,
-      filename,
+      url: stored.url,
+      filename: stored.filename,
       mimeType: mime,
       sizeBytes: file.size,
       alt,

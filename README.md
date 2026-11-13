@@ -154,11 +154,23 @@ bunx tsc --noEmit    # se espera: sin salida (exit 0)
 - **Sin integración SRI real**: la facturación es interna con numeración configurable; no emite comprobantes electrónicos oficiales (ADR-013).
 - **Sin entregas a domicilio**: por decisión de negocio el catering se monta en el lugar del evento (los términos sembrados y el FAQ lo declaran).
 - **Imágenes semilla generadas con IA** (`scripts/generate-images.ts`): sustituibles desde el panel (Contenido/Medios y Productos).
-- **Entorno sandbox**: se opera con `bun run dev`; no se usa `npm run build` aquí. SQLite en archivo local (migración a PostgreSQL documentada en ADR-001).
+- **Entorno sandbox**: se opera con `bun run dev`; no se usa `npm run build` aquí. SQLite en archivo local para desarrollo; PostgreSQL en producción vía Neon (ADR-001 y [docs/deploy-vercel-neon.md](docs/deploy-vercel-neon.md)).
 - **Rate limiting en memoria** (por proceso): suficiente para un despliegue único; horizontalizar exigiría Redis o equivalente.
+
+## Despliegue a producción (Vercel + Neon)
+
+El proyecto está listo para desplegarse en **Vercel** con base de datos **Neon** (PostgreSQL serverless) y subida de imágenes en **Vercel Blob**, manteniendo SQLite para desarrollo local. Guía completa paso a paso: [docs/deploy-vercel-neon.md](docs/deploy-vercel-neon.md).
+
+```bash
+# 1) Tablas + datos reales del sandbox → Neon (cadena directa, sin -pooler-)
+NEON_DATABASE_URL="postgresql://…" bun run db:deploy-neon
+# 2) Importar el repo en Vercel (vercel.json ya define el build)
+#    y configurar DATABASE_URL (pooled), AUTH_SECRET y BLOB_READ_WRITE_TOKEN
+```
 
 ## Documentación
 
 - Decisiones de arquitectura: [docs/decisions/](docs/decisions/) (ADR-001 a ADR-015).
 - Contratos de API: [docs/api-contract.md](docs/api-contract.md).
+- Despliegue en Vercel + Neon: [docs/deploy-vercel-neon.md](docs/deploy-vercel-neon.md).
 - Operación diaria, respaldos y solución de problemas: [docs/runbook.md](docs/runbook.md).

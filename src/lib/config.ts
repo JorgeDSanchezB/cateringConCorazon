@@ -47,6 +47,17 @@ if (!parsed.success) {
 
 export const config = parsed.data;
 
+// En Vercel el secreto de sesiones es OBLIGATORIO: sin él no se permite el
+// arranque (el fallback de desarrollo está pensado solo para el sandbox).
+// Se detecta por VERCEL (presente solo en esa plataforma) para no afectar al
+// despliegue standalone del sandbox, que corre en producción sin AUTH_SECRET.
+if (process.env.VERCEL && !parsed.data.AUTH_SECRET) {
+  throw new Error(
+    "[CONFIG] AUTH_SECRET es obligatoria en Vercel. Genera un secreto con `openssl rand -hex 32` " +
+      "y configúralo como variable de entorno del proyecto (ver docs/deploy-vercel-neon.md).",
+  );
+}
+
 /** Directorio (dentro de /public) donde se guardan los medios subidos. */
 export const UPLOAD_DIR = "public/uploads";
 
