@@ -42,9 +42,9 @@ import { ApiError, apiErrorMessage } from "@/components/ccc/shared/api-client";
 import { ImageField, MediaPicker } from "./media-picker";
 
 /**
- * Contenido editorial del sitio: banners (home), testimonios (flag) y FAQ.
- * CRUD completo contra /api/admin/content/*, tablas virtualizadas y
- * claves estables por id.
+ * Contenido editorial del sitio: carrusel de la portada (banners), testimonios
+ * (flag) y FAQ. CRUD completo contra /api/admin/content/*, tablas virtualizadas
+ * y claves estables por id.
  */
 
 // ─────────────────────── Banners ───────────────────────
@@ -69,7 +69,7 @@ function BannersTab() {
     (id) => `/api/admin/content/banners/${id}`,
     {
       successMessage: "Banner eliminado.",
-      invalidate: [["/api/admin/content/banners"], ["/api/public/bootstrap"]],
+      invalidate: [["/api/admin/content/banners"], ["public-bootstrap"]],
     },
   );
 
@@ -160,7 +160,7 @@ function BannersTab() {
     <div className="space-y-4">
       <div className="flex justify-end">
         <Button onClick={() => setEditing("new")} size="sm">
-          <Plus className="size-4" aria-hidden /> Nuevo banner
+          <Plus className="size-4" aria-hidden /> Nueva imagen del carrusel
         </Button>
       </div>
       {list.isLoading ? (
@@ -205,7 +205,7 @@ function BannerDialog({ banner, onClose }: { banner: BannerRow | null; onClose: 
 
   const create = useAdminMutation<BannerRow, typeof body>("POST", "/api/admin/content/banners", {
     successMessage: "Banner creado.",
-    invalidate: [["/api/admin/content/banners"], ["/api/public/bootstrap"]],
+    invalidate: [["/api/admin/content/banners"], ["public-bootstrap"]],
     onDone: onClose,
   });
   const update = useBodyMutation<BannerRow, { id: string; body: typeof body }>(
@@ -214,7 +214,7 @@ function BannerDialog({ banner, onClose }: { banner: BannerRow | null; onClose: 
     (v) => v.body,
     {
       successMessage: "Banner actualizado.",
-      invalidate: [["/api/admin/content/banners"], ["/api/public/bootstrap"]],
+      invalidate: [["/api/admin/content/banners"], ["public-bootstrap"]],
       onDone: onClose,
     },
   );
@@ -233,7 +233,7 @@ function BannerDialog({ banner, onClose }: { banner: BannerRow | null; onClose: 
           <FormField label="Subtítulo">
             <Input value={subtitle} onChange={(e) => setSubtitle(e.target.value)} maxLength={200} />
           </FormField>
-          <FormField label="Imagen" hint="Se muestra como fondo del banner de portada.">
+          <FormField label="Imagen" hint="Imagen de fondo de esta tarjeta del carrusel (portada, debajo del hero).">
             <ImageField url={imageUrl} onPick={setImageUrl} onOpen={() => setMediaOpen(true)} />
           </FormField>
           <FormField label="Enlace" hint="Ruta interna, ej: #/catalogo">
@@ -288,7 +288,7 @@ function TestimonialsTab() {
     (id) => `/api/admin/content/testimonials/${id}`,
     {
       successMessage: "Testimonio eliminado.",
-      invalidate: [["/api/admin/content/testimonials"], ["/api/public/bootstrap"]],
+      invalidate: [["/api/admin/content/testimonials"], ["public-bootstrap"]],
     },
   );
 
@@ -403,7 +403,7 @@ function TestimonialDialog({ testimonial, onClose }: { testimonial: TestimonialR
 
   const create = useAdminMutation<TestimonialRow, typeof body>("POST", "/api/admin/content/testimonials", {
     successMessage: "Testimonio creado.",
-    invalidate: [["/api/admin/content/testimonials"], ["/api/public/bootstrap"]],
+    invalidate: [["/api/admin/content/testimonials"], ["public-bootstrap"]],
     onDone: onClose,
   });
   const update = useBodyMutation<TestimonialRow, { id: string; body: typeof body }>(
@@ -412,7 +412,7 @@ function TestimonialDialog({ testimonial, onClose }: { testimonial: TestimonialR
     (v) => v.body,
     {
       successMessage: "Testimonio actualizado.",
-      invalidate: [["/api/admin/content/testimonials"], ["/api/public/bootstrap"]],
+      invalidate: [["/api/admin/content/testimonials"], ["public-bootstrap"]],
       onDone: onClose,
     },
   );
@@ -490,7 +490,7 @@ function FaqsTab() {
     (id) => `/api/admin/content/faqs/${id}`,
     {
       successMessage: "Pregunta eliminada.",
-      invalidate: [["/api/admin/content/faqs"], ["/api/public/bootstrap"]],
+      invalidate: [["/api/admin/content/faqs"], ["public-bootstrap"]],
     },
   );
 
@@ -594,7 +594,7 @@ function FaqDialog({ faq, onClose }: { faq: FaqRow | null; onClose: () => void }
 
   const create = useAdminMutation<FaqRow, typeof body>("POST", "/api/admin/content/faqs", {
     successMessage: "Pregunta creada.",
-    invalidate: [["/api/admin/content/faqs"], ["/api/public/bootstrap"]],
+    invalidate: [["/api/admin/content/faqs"], ["public-bootstrap"]],
     onDone: onClose,
   });
   const update = useBodyMutation<FaqRow, { id: string; body: typeof body }>(
@@ -603,7 +603,7 @@ function FaqDialog({ faq, onClose }: { faq: FaqRow | null; onClose: () => void }
     (v) => v.body,
     {
       successMessage: "Pregunta actualizada.",
-      invalidate: [["/api/admin/content/faqs"], ["/api/public/bootstrap"]],
+      invalidate: [["/api/admin/content/faqs"], ["public-bootstrap"]],
       onDone: onClose,
     },
   );
@@ -656,12 +656,12 @@ export default function ContentView() {
     <div className="space-y-4">
       <ViewHeader
         title="Contenido"
-        description="Banners de portada, testimonios (flag) y preguntas frecuentes. Todo editable sin tocar código."
+        description="Carrusel de imágenes de la portada (la sección que rota debajo del hero), testimonios (flag) y preguntas frecuentes. Todo editable sin tocar código."
       />
 
       <Tabs value={tab} onValueChange={setTab} aria-label="Tipo de contenido">
         <TabsList>
-          <TabsTrigger value="banners">Banners</TabsTrigger>
+          <TabsTrigger value="banners">Carrusel de portada</TabsTrigger>
           <TabsTrigger value="testimonials">Testimonios</TabsTrigger>
           <TabsTrigger value="faqs">Preguntas frecuentes</TabsTrigger>
         </TabsList>

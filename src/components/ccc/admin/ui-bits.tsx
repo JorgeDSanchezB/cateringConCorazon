@@ -1,12 +1,11 @@
 "use client";
 
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, AlertTriangle, Inbox, ChevronDown } from "lucide-react";
-import { parseMoneyToCents } from "@/lib/domain/money";
 
 /**
  * Piezas UI compartidas del admin (sin duplicar lógica de presentación).
@@ -43,7 +42,32 @@ export function FormField({
   );
 }
 
-/** Entrada de dinero en dólares que emite CENTAVOS. */
+/**
+ * Parseo TOLERANTE de dinero mientras se teclea (estados intermedios válidos):
+ * acepta "4", "4.", "4.5", "4.50", "4,50" (coma decimal) y ".5".
+ * Devuelve null si está vacío o no es parseable. Máximo 2 decimales.
+ */
+export function parseMoneyInputToCents(raw: string): number | null {
+  const t = raw.trim().replace(",", ".");
+  if (t === "") return null;
+  if (!/^(\d+(\.\d{0,2})?|\.\d{1,2})$/.test(t)) return null;
+  const value = t.endsWith(".") ? t.slice(0, -1) : t;
+  return Math.round(Number(value) * 100);
+}
+
+/**
+ * Entrada de dinero en dólares que emite CENTAVOS.
+ * Mantiene el TEXTO tal cual lo teclea el usuario (para poder escribir
+ * "4.50" sin que el formato pise cada tecla) y normaliza a "4.50"
+ * al perder el foco. Acepta coma decimal (es-EC) y estados parciales
+ * como "4." o "4.5".
+ *
+ * Sincronización con el padre SIN efectos ni refs (patrón de estado
+ * derivado): cada tecla emite el centavo parseado y el padre lo refleja
+ * en `cents`; si `cents` difiere de lo que el texto actual representa,
+ * es un cambio EXTERNO (carga de otro registro / reset) y adoptamos ese
+ * valor como texto.
+ */
 export function MoneyInput({
   cents,
   onCentsChange,
@@ -57,17 +81,40 @@ export function MoneyInput({
   disabled?: boolean;
   id?: string;
 }) {
-  const display = cents === null ? "" : (cents / 100).toFixed(2);
+  const [text, setText] = useState(cents === null ? "" : (cents / 100).toFixed(2));
+
+  const parsedText = parseMoneyInputToCents(text);
+  if (cents !== parsedText) {
+    // Cambio externo (no provocado por este input): adopta el valor del padre.
+    // La guarda `canonical !== text` evita bucles con textos no parseables.
+    const canonical = cents === null ? "" : (cents / 100).toFixed(2);
+    if (canonical !== text) setText(canonical);
+  }
+
   return (
     <Input
       id={id}
       inputMode="decimal"
+      autoComplete="off"
       placeholder={placeholder ?? "0.00"}
-      value={display}
+      value={text}
       disabled={disabled}
       onChange={(e) => {
-        const parsed = parseMoneyToCents(e.target.value);
-        onCentsChange(parsed);
+        setText(e.target.value);
+        onCentsChange(parseMoneyInputToCents(e.target.value));
+      }}
+      onBlur={() => {
+        // Normaliza al salir: "4.5"/"4," → "4.50"; basura → último valor real.
+        const parsed = parseMoneyInputToCents(text);
+        if (parsed !== null) {
+          const canonical = (parsed / 100).toFixed(2);
+          if (canonical !== text) setText(canonical);
+          onCentsChange(parsed);
+        } else {
+          const canonical = cents === null ? "" : (cents / 100).toFixed(2);
+          if (canonical !== text) setText(canonical);
+          onCentsChange(cents);
+        }
       }}
       aria-label="Monto en dólares"
     />
