@@ -580,8 +580,10 @@ async function main() {
   for (const page of LEGAL_PAGES) {
     await db.legalPage.upsert({
       where: { slug: page.slug },
+      // update NO toca isActive: re-ejecutar el seed no pisa la
+      // activación/desactivación decidida por el administrador.
       update: { title: page.title, content: page.content },
-      create: { slug: page.slug, title: page.title, content: page.content },
+      create: { slug: page.slug, title: page.title, content: page.content, isActive: true },
     });
   }
 

@@ -1,9 +1,9 @@
 "use client";
 
 import ReactMarkdown from "react-markdown";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, FileClock } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { api, apiErrorMessage } from "@/components/ccc/shared/api-client";
+import { api, apiErrorMessage, ApiError } from "@/components/ccc/shared/api-client";
 import { useBootstrapData, useSiteFormat } from "@/components/ccc/shared/use-bootstrap";
 import { ErrorBlock, EmptyBlock, LoadingBlock } from "@/components/ccc/admin/ui-bits";
 import { PageContainer } from "./ui";
@@ -53,6 +53,23 @@ export function LegalView({ slug }: { slug: string }) {
 
   if (page.isLoading) return <PageContainer><LoadingBlock label="Cargando documento legal…" /></PageContainer>;
   if (page.isError) {
+    // 404 = página inexistente o desactivada por el admin: estado informativo,
+    // sin reintentar (reintentar no la va a publicar). El resto de errores
+    // sí son transitorios y ofrecen reintento (Regla 4).
+    const isNotFound = page.error instanceof ApiError && page.error.problem.status === 404;
+    if (isNotFound) {
+      return (
+        <PageContainer>
+          <div className="mx-auto flex max-w-xl flex-col items-center gap-3 rounded-xl border border-dashed p-10 text-center">
+            <FileClock className="size-8 text-muted-foreground" aria-hidden="true" />
+            <p className="font-heading text-lg font-semibold text-foreground">
+              Documento no disponible temporalmente
+            </p>
+            <p className="text-sm text-muted-foreground">{apiErrorMessage(page.error)}</p>
+          </div>
+        </PageContainer>
+      );
+    }
     return (
       <PageContainer>
         <ErrorBlock message={apiErrorMessage(page.error)} onRetry={() => void page.refetch()} />

@@ -491,6 +491,9 @@ model LegalPage {
   slug      String   @unique
   title     String
   content   String
+  /// Página visible en la web pública (toggle por página desde el admin).
+  /// Desactivada: no aparece en el pie ni es accesible en #/legal/<slug>.
+  isActive  Boolean  @default(true)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }

@@ -81,7 +81,10 @@ export async function getPublicBootstrap(): Promise<PublicBootstrap> {
         orderBy: [{ sortOrder: "asc" }, { createdAt: "asc" }],
         take: 30,
       }),
+      // Solo páginas legales ACTIVAS: una página desactivada desde el admin
+      // desaparece del pie y de la navegación pública (Regla 1: cero hardcode).
       db.legalPage.findMany({
+        where: { isActive: true },
         select: { slug: true, title: true },
         orderBy: { slug: "asc" },
       }),

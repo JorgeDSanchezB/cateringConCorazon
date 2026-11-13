@@ -8,13 +8,19 @@ import { getSiteSettings } from "@/lib/settings";
 
 /**
  * GET /api/admin/legal/:slug  (ADMIN)
- * PUT /api/admin/legal/:slug  (ADMIN)
+ * PUT /api/admin/legal/:slug  (ADMIN) — guarda título + contenido
+ * PATCH /api/admin/legal/:slug  (ADMIN) — activa/desactiva la página sin
+ *   tocar su contenido (botón por página del apartado legal).
  * El disclaimer legal global (setting) se devuelve junto a la página para
  * mostrar el aviso de revisión legal también dentro del editor.
  */
 const legalPutSchema = z.object({
   title: z.string().trim().min(4).max(120),
   content: z.string().trim().min(50, "El contenido legal es demasiado corto").max(40_000),
+});
+
+const legalPatchSchema = z.object({
+  isActive: z.boolean(),
 });
 
 export const GET = apiHandler<{ params: Promise<{ slug: string }> }>(async (req, ctx) => {
@@ -32,10 +38,26 @@ export const PUT = apiHandler<{ params: Promise<{ slug: string }> }>(async (req,
   await requireUser(req, { roles: ["ADMIN"] });
   const { slug } = await ctx.params;
   const body = await parseBody(req, legalPutSchema);
+  // El PUT no modifica isActive: guardar el texto no re-publica una página
+  // que el admin decidió ocultar (ni oculta una que decidió mostrar).
   const page = await db.legalPage.upsert({
     where: { slug },
     update: { title: body.title, content: body.content },
     create: { slug, title: body.title, content: body.content },
   });
   return jsonOk(page);
+});
+
+export const PATCH = apiHandler<{ params: Promise<{ slug: string }> }>(async (req, ctx) => {
+  await requireUser(req, { roles: ["ADMIN"] });
+  const { slug } = await ctx.params;
+  const body = await parseBody(req, legalPatchSchema);
+  // PATCH solo sobre páginas existentes: no crea páginas por accidente.
+  const existing = await db.legalPage.findUnique({ where: { slug }, select: { id: true } });
+  if (!existing) throw new NotFoundError("Página legal");
+  const page = await db.legalPage.update({
+    where: { slug },
+    data: { isActive: body.isActive },
+  });
+  return jsonOk({ slug: page.slug, title: page.title, isActive: page.isActive });
 });
