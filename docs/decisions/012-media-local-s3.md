@@ -24,3 +24,20 @@ El panel necesita subir imágenes (banners, fotos de producto, logo, favicon) y 
 ## Alternativa descartada
 
 **Solo URLs externas** (sin subida): obligaría a alojar las imágenes fuera antes de poder cambiar un banner y depender de terceros para contenido propio (y su vida útil), contradiciendo "funcionar sin servicios externos". También se descartó implementar ya el cliente S3/R2: exigiría credenciales y un bucket reales para probar algo que este entorno no tiene; quedó como adaptador documentado (decisión 4).
+
+## Actualización (2026) — tercer modo "db": la imagen vive dentro de la BD
+
+Al desplegar en Vercel (serverless, FS de solo lectura) el modo `local` no
+puede escribir. En lugar de exigir Vercel Blob (servicio externo extra), el
+adaptador ganó un modo **`db`**: `putImage` guarda el contenido base64 en la
+nueva columna `MediaAsset.data` y devuelve la URL `GET /api/media/<id>`
+(ruta pública con `Cache-Control: immutable` de un año; el id es un UUID no
+adivinable). Es el modo **por defecto en Vercel** cuando no hay token de
+Blob; `local` sigue siendo el modo por defecto del sandbox y `blob` se
+activa solo si existe `BLOB_READ_WRITE_TOKEN`. Override manual:
+`MEDIA_STORAGE=local|db|blob`.
+
+Coste: la BD crece con cada subida (tope 5 MB/imagen, catálogo pequeño);
+`GET /api/admin/media` y la respuesta del upload no exponen `data`
+(whitelist de columnas); una re-sincronización `db:migrate-neon` reemplaza
+también estas imágenes (documentado en docs/deploy-vercel-neon.md).

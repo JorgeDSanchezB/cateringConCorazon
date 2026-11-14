@@ -11,9 +11,10 @@ import { putImage } from "@/lib/storage";
  * GET  /api/admin/media  (ADMIN) — galería paginada por cursor.
  * POST /api/admin/media  (ADMIN) — upload multipart (form-data: file, alt?).
  *
- * Almacenamiento vía adaptador (src/lib/storage.ts): Vercel Blob en
- * producción (token presente) o disco local public/uploads en desarrollo
- * (ADR-012). La BD solo guarda la URL pública resultante.
+ * Almacenamiento vía adaptador (src/lib/storage.ts, ADR-012): Vercel Blob
+ * si hay token, dentro de la BD (MediaAsset.data + GET /api/media/<id>) en
+ * serverless sin Blob, o disco local public/uploads en desarrollo. La URL
+ * pública resultante es agnóstica para el resto del sistema.
  */
 export const GET = apiHandler(async (req: NextRequest) => {
   await requireUser(req, { roles: ["ADMIN"] });
@@ -73,7 +74,12 @@ export const POST = apiHandler(async (req: NextRequest) => {
       mimeType: mime,
       sizeBytes: file.size,
       alt,
+      // Modo "db": contenido base64; en local/blob es undefined (null).
+      data: stored.data ?? null,
     },
+    // La respuesta NO incluye el contenido base64 (misma whitelist que la
+    // galería GET): evita devolver cientos de KB innecesarios.
+    select: { id: true, url: true, filename: true, mimeType: true, sizeBytes: true, alt: true, createdAt: true },
   });
   return jsonOk(asset, { status: 201 });
 });

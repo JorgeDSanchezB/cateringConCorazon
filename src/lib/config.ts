@@ -30,6 +30,13 @@ const EnvSchema = z.object({
   ATTRIBUTES_MAX_KEYS: z.coerce.number().int().min(4).default(32),
   /** Uploads de medios (almacenamiento local; S3 documentado como opcional). */
   UPLOAD_MAX_BYTES: z.coerce.number().int().default(5_242_880),
+  /**
+   * Override manual del adaptador de medios (src/lib/storage.ts):
+   * "local" = disco public/uploads, "db" = dentro de la BD (Neon),
+   * "blob" = Vercel Blob. Sin definir: auto (Blob si hay token; db si
+   * corre en Vercel; local en el resto).
+   */
+  MEDIA_STORAGE: z.enum(["local", "db", "blob"]).optional(),
   SESSION_TTL_HOURS: z.coerce.number().int().min(1).default(12),
   BCRYPT_ROUNDS: z.coerce.number().int().min(4).max(15).default(12),
 });

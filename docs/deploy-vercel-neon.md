@@ -11,7 +11,7 @@ afecta al sandbox o a `bun run dev`.
 |---|---|---|
 | Hosting | `bun run dev` (puerto 3000) | Vercel (Next.js) |
 | Base de datos | SQLite `db/custom.db` | Neon PostgreSQL |
-| Subida de imágenes | disco `public/uploads` | **Vercel Blob** |
+| Subida de imágenes | disco `public/uploads` | **Dentro de Neon** (opcional: Vercel Blob) |
 | Secreto de sesiones | fallback de desarrollo | `AUTH_SECRET` (obligatoria) |
 
 Qué preparó el código:
@@ -21,8 +21,10 @@ Qué preparó el código:
   Prisma correcto y compila con `next build`.
 - `scripts/neon-deploy.ts` orquesta la BD en Neon (`db:push-neon`,
   `db:migrate-neon`, `db:seed-neon`, `db:deploy-neon`).
-- `src/lib/storage.ts` sube imágenes a Vercel Blob si hay
-  `BLOB_READ_WRITE_TOKEN` y a disco local si no (transparencia total).
+- `src/lib/storage.ts` sube imágenes al almacén según el modo: **dentro de
+  Neon** (base64 + `GET /api/media/<id>`) por defecto en Vercel, a Vercel
+  Blob si existe `BLOB_READ_WRITE_TOKEN` (mejora opcional con CDN), o a
+  disco local en desarrollo. Cero servicios extra obligatorios.
 - `src/lib/config.ts` **aborta el arranque en Vercel sin `AUTH_SECRET`**
   (fail-fast en el deploy, no en producción con secreto débil).
 
@@ -61,15 +63,22 @@ Notas:
 - Las imágenes ya subidas viven en `public/uploads` **versionado en git**, así que
   Vercel las sirve como assets estáticos: los datos migrados siguen funcionando.
 
-## Paso 3 — Vercel Blob (subidas de imágenes en producción)
+## Paso 3 — Subidas de imágenes en producción (ya resuelto con Neon)
 
-El filesystem de Vercel es de **solo lectura**: sin esto, subir imágenes
-fallaría en producción.
+El filesystem de Vercel es de **solo lectura**, así que las imágenes nuevas
+que subas desde el panel **no** pueden guardarse en disco. La solución por
+defecto no requiere NINGÚN servicio adicional:
 
-1. En Vercel: **Storage → Blob → Create Database** (p. ej. `catering-media`).
-2. Conecta el store a tu proyecto (o copia el `BLOB_READ_WRITE_TOKEN`).
-3. Las nuevas subidas devolverán URLs `https://…public.blob.vercel-storage.com/…`
-   que la galería, el carrusel y los productos consumen sin cambios.
+- **Modo `db` (automático en Vercel sin configurar nada)**: la imagen se
+  guarda DENTRO de Neon (columna `MediaAsset.data`, base64) y se sirve por
+  `GET /api/media/<id>` con caché inmutable de un año. Las imágenes ya
+  subidas siguen siendo archivos estáticos del repo (`public/uploads`).
+- **Modo `blob` (opcional)**: si algún día quieres CDN y descarga la BD,
+  crea un store en Vercel (**Storage → Blob → Create**) y conéctalo al
+  proyecto: al aparecer `BLOB_READ_WRITE_TOKEN` el adaptador cambia solo y
+  las subidas nuevas irán a Blob. Las URL existentes siguen funcionando.
+- Forzar un modo concreto: variable `MEDIA_STORAGE=local|db|blob` (raro que
+  haga falta; útil en self-hosted).
 
 ## Paso 4 — Importar el proyecto en Vercel
 
@@ -82,7 +91,7 @@ fallaría en producción.
    |---|---|
    | `DATABASE_URL` | cadena **POOLED** de Neon (con `-pooler.` y `?sslmode=require`) |
    | `AUTH_SECRET` | `openssl rand -hex 32` (sin esto el deploy falla a propósito) |
-   | `BLOB_READ_WRITE_TOKEN` | token del store del Paso 3 |
+   | `BLOB_READ_WRITE_TOKEN` | **Opcional**: solo si quieres Blob (Paso 3, modo blob) |
 
 3. Deploy. La primera compilación tarda un poco (instala dependencias,
    genera el cliente Prisma Postgres y compila).
@@ -94,7 +103,8 @@ fallaría en producción.
 - [ ] `#/admin` → login con el usuario ADMIN (el migrado del sandbox o el del seed).
 - [ ] **Cambiar la contraseña** del admin (si migraste datos de desarrollo).
 - [ ] Contenido → Carrusel → editar una tarjeta → Elegir imagen → **subir una
-      imagen nueva** (valida Vercel Blob: debe aparecer con URL `blob.vercel-storage.com`).
+      imagen nueva** (con el modo `db` por defecto debe aparecer con URL
+      `/api/media/<uuid>`; si configuraste Blob, `blob.vercel-storage.com`).
 - [ ] Crear un pedido de prueba desde la web pública y confirmar el WhatsApp.
 - [ ] Contabilidad/POS cargan (lectura de Neon correcta).
 
@@ -116,6 +126,8 @@ fallaría en producción.
 - Cambios de esquema: edita `prisma/schema.prisma` → `bun run db:push` (local)
   → `NEON_DATABASE_URL="…" bun run db:push-neon` (Neon) → redeploy en Vercel.
 - Resincronizar datos del sandbox a Neon: `NEON_DATABASE_URL="…" bun run db:migrate-neon`
-  (⚠️ reemplaza el contenido de Neon).
+  (⚠️ reemplaza el contenido de Neon, incluidas las imágenes guardadas en la
+  BD por el modo `db`: lo que se haya subido directamente en producción se
+  perdería; haz antes un backup o exporta esos assets).
 - El cliente Prisma local siempre es SQLite: los scripts de Neon restauran el
   estado local al terminar (`prisma generate`).

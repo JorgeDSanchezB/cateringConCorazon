@@ -439,6 +439,10 @@ model MediaAsset {
   mimeType  String
   sizeBytes Int
   alt       String?
+  /// Contenido base64 cuando la imagen vive DENTRO de la BD (modo de
+  /// almacenamiento "db": serverless sin almacén de objetos). null = el
+  /// archivo vive fuera (/uploads estático o URL absoluta de terceros).
+  data      String?
   createdAt DateTime @default(now())
 
   @@index([createdAt, id])

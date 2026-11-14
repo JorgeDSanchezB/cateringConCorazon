@@ -112,9 +112,10 @@ Ver `docs/deploy-vercel-neon.md`. Puntos críticos:
   no se edita a mano ni se versiona.
 - `vercel.json` fija el build (`bun run build:vercel`); no cambiar el script
   `build` (lo usa la plataforma del sandbox con output standalone).
-- Subidas de imágenes: `src/lib/storage.ts` decide Vercel Blob vs disco local
-  según `BLOB_READ_WRITE_TOKEN`. Nunca escribir en disco desde una ruta de
-  API sin pasar por el adaptador.
+- Subidas de imágenes: `src/lib/storage.ts` decide el almacén (Vercel Blob si
+  hay token, dentro de la BD servida por `GET /api/media/<id>` en serverless,
+  o disco local en desarrollo; override con `MEDIA_STORAGE`). Nunca escribir
+  en disco desde una ruta de API sin pasar por el adaptador.
 - `AUTH_SECRET` es obligatoria en Vercel (fail-fast en `src/lib/config.ts`).
 - Scripts de BD Neon: `db:push-neon`, `db:migrate-neon`, `db:seed-neon`,
   `db:deploy-neon` (requieren `NEON_DATABASE_URL`, cadena directa).
